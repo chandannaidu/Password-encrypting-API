@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
-import os
+import os,stat
 from random import randrange as rr
 
 path = "/usr/src/app/Api_password/"
@@ -15,6 +15,31 @@ def random_generator():
     return s
 
 
+def only_app(file_name):
+    os.chmod("%s%s" %(path,file_name+".txt"), stat.S_IXUSR )
+    return True
+
+
+def only_write(file_name):
+    os.chmod("%s%s"%(path,file_name+".txt"), stat.S_IWRITE )
+    return True
+
+def only_read(file_name):
+    os.chmod("%s%s"%(path,file_name+".txt"), stat.S_IRUSR )
+    return True
+
+
+def rename(file_name):
+    os.chdir("/usr/src/app/Api_password/")
+    os.rename(file_name+".txt",file_name+".dng")   
+    return True
+
+def rename_dng(file_name):
+    os.chdir("/usr/src/app/Api_password/")
+    os.rename(file_name+".dng",file_name+".txt")
+    return True
+
+
 
 
 def encrypt(text,s): 
@@ -22,7 +47,11 @@ def encrypt(text,s):
   
     # traverse text 
     for i in range(len(text)): 
-        char = text[i] 
+        char = text[i]
+
+        if (char.isnumeric()):
+            result += char
+            continue 
 
         #Special char
         if char in ['@','#' ,'$' ,'%' , '!','&']:
@@ -48,7 +77,13 @@ def de_crypt(text,s):
   
     # traverse text 
     for i in range(len(text)): 
-        char = text[i] 
+        char = text[i]
+
+        if (char.isnumeric()):
+            result += char
+            continue
+
+
 
         if char == '@' or char =='#' or char =='$' or char =='%' or char =='!' or char =='&':
             result += str(char)
@@ -70,7 +105,7 @@ def de_crypt(text,s):
 
 
 def _mkdir_():
-    path1 = "/usr/src/app"
+    path1 = "/usr/src/app/"
     list_dir = os.listdir(path1)
     if "Api_password" not in list_dir: 
         os.mkdir(path)
@@ -90,29 +125,41 @@ def _mkdir_():
 
 
 
-def _mkfile_(domain,password,n):
+def _mkfile_(file_name,password,n):
     path1 = "/usr/src/app/Api_password"
     n = str(n)
     list_dir = os.listdir(path1)
-    if  domain+".txt" not in list_dir: 
-        f = open("%s/%s.txt"%(path,domain),"w+")
+    if  file_name+".txt" not in list_dir: 
+        f = open("%s/%s.txt"%(path,file_name),"w+")
         f.write(password)
         f.write("\n")
         f.write(n)
         f.close()
+        only_write(file_name)
         retJson = {
-            "msg" : "successfully created %s.txt file"%domain,
-            "status" : 200
+        "msg" : "successfully created %s.txt file"%file_name,
+        "status" : 200
         }
+        only_app(file_name)
         print(retJson)
-        return True
+        if rename(file_name):
+            return True
     else:
-        retJson = {
-            "msg" : "%s already exist"%domain,
-            "status" : 200
-        }
-        print(retJson)
-        return True
+        if rename_dng(file_name):
+            only_write(file_name)
+            f = open("%s%s.txt"%(path,file_name),"w")
+            f.write(password)
+            f.write("\n")
+            f.write(n)
+            f.close()
+            retJson = {
+                "msg" : "%s already exist"%file_name,
+                "status" : 200
+            }
+            only_app(file_name)
+            print(retJson)
+        if rename(file_name):
+            return True
 
 
 
@@ -120,17 +167,18 @@ class encrpt_data(Resource):
     def post(self):
         postedData = request.get_json()
 
-        domain = postedData["domain"]
+        file_name = postedData["file_name"]
         password = postedData["password"]
 
         n = random_generator()
-        password = encrypt(password,n)
+        password1 = encrypt(password,n)
 
         if _mkdir_():
-            if _mkfile_(domain,password,n):
+            if _mkfile_(file_name,password1,n):
                 retJson = {
-                "domain" : domain,
-                "en_password" : password,
+                "domain" : file_name,
+                "your_password" : password,
+                "en_password" : password1,
                 "shift" : n,
                 "status" : 200,
                 "msg" : "Successfully created"
@@ -149,29 +197,36 @@ class decrypt_data(Resource):
 
         postedData = request.get_json()
 
-        domain = postedData["domain"]
+        file_name = postedData["file_name"]
+
+        rename_dng(file_name)
         
-        list_file = os.listdir(path1)
+        if only_read(file_name):
+        
+            list_file = os.listdir(path1)
 
-        if domain+".txt" in list_file:
-            file_na = list_file.index(domain+".txt")
-            val = list_file[file_na]
-            with open(path1+"/%s" %val, 'r') as f:
-                for s in f:
-                    password = s.rstrip()
+            if file_name+".txt" in list_file:
+                file_na = list_file.index(file_name+".txt")
+                val = list_file[file_na]
+                with open(path1+"/%s" %val, 'r') as f:
                     for s in f:
-                        n = s
+                        password = s.rstrip()
+                        for s in f:
+                            n = s
+        if only_app(file_name):
 
-        n = 26 - int(n)            
-        password = de_crypt(password,n)
+            rename(file_name)
 
-        retJson = {
-            "domain" : domain,
-            "decrypt_password" : password,
-            "status" : 200,
-            "msg" : "Successfully decrypted"
-        }
-        return jsonify(retJson)
+            n = 26 - int(n)            
+            password = de_crypt(password,n)
+
+            retJson = {
+                "filename" : file_name,
+                "decrypt_password" : password,
+                "status" : 200,
+                "msg" : "Successfully decrypted"
+            }
+            return jsonify(retJson)
                 
 
 
