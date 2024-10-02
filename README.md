@@ -12,4 +12,4 @@ API for encrypting your passwords and store it in your desktop and retrive when 
     server starts listening at localhost:5000/
     
  5) Use method Post to request 
- 6) At end Run $docker-compose down 
+ 6) At end Run $docker-compose  
