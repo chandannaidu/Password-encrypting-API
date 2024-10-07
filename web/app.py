@@ -70,7 +70,7 @@ def encrypt(text,s):
 
 
 
-
+###############################
 
 def de_crypt(text,s): 
     result = "" 
